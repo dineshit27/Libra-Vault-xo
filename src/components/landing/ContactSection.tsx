@@ -1,4 +1,4 @@
-import { useState, MouseEvent as ReactMouseEvent } from "react";
+import { useState, MouseEvent as ReactMouseEvent, lazy, Suspense } from "react";
 import { motion, useAnimate } from "framer-motion";
 import {
   Phone, Mail, MapPin, Clock,
@@ -7,6 +7,80 @@ import {
   Globe, Twitter, Instagram, Youtube, Linkedin, Facebook,
   type LucideIcon
 } from "lucide-react";
+
+const LazyWorld = lazy(() =>
+  import("@/components/ui/globe").then((m) => ({ default: m.World }))
+);
+
+/* ── Globe Arc Data ─────────────────────────────────────────── */
+const GLOBE_COLORS = ["#06b6d4", "#3b82f6", "#6366f1"];
+const pickColor = () => GLOBE_COLORS[Math.floor(Math.random() * GLOBE_COLORS.length)];
+
+const GLOBE_CONFIG = {
+  pointSize: 4,
+  globeColor: "#062056",
+  showAtmosphere: true,
+  atmosphereColor: "#FFFFFF",
+  atmosphereAltitude: 0.1,
+  emissive: "#062056",
+  emissiveIntensity: 0.1,
+  shininess: 0.9,
+  polygonColor: "rgba(255,255,255,0.7)",
+  ambientLight: "#38bdf8",
+  directionalLeftLight: "#ffffff",
+  directionalTopLight: "#ffffff",
+  pointLight: "#ffffff",
+  arcTime: 1000,
+  arcLength: 0.9,
+  rings: 1,
+  maxRings: 3,
+  initialPosition: { lat: 22.3193, lng: 114.1694 },
+  autoRotate: true,
+  autoRotateSpeed: 0.5,
+};
+
+const SAMPLE_ARCS = [
+  { order: 1, startLat: -19.885592, startLng: -43.951191, endLat: -22.9068, endLng: -43.1729, arcAlt: 0.1, color: pickColor() },
+  { order: 1, startLat: 28.6139, startLng: 77.209, endLat: 3.139, endLng: 101.6869, arcAlt: 0.2, color: pickColor() },
+  { order: 1, startLat: -19.885592, startLng: -43.951191, endLat: -1.303396, endLng: 36.852443, arcAlt: 0.5, color: pickColor() },
+  { order: 2, startLat: 1.3521, startLng: 103.8198, endLat: 35.6762, endLng: 139.6503, arcAlt: 0.2, color: pickColor() },
+  { order: 2, startLat: 51.5072, startLng: -0.1276, endLat: 3.139, endLng: 101.6869, arcAlt: 0.3, color: pickColor() },
+  { order: 2, startLat: -15.785493, startLng: -47.909029, endLat: 36.162809, endLng: -115.119411, arcAlt: 0.3, color: pickColor() },
+  { order: 3, startLat: -33.8688, startLng: 151.2093, endLat: 22.3193, endLng: 114.1694, arcAlt: 0.3, color: pickColor() },
+  { order: 3, startLat: 21.3099, startLng: -157.8581, endLat: 40.7128, endLng: -74.006, arcAlt: 0.3, color: pickColor() },
+  { order: 3, startLat: -6.2088, startLng: 106.8456, endLat: 51.5072, endLng: -0.1276, arcAlt: 0.3, color: pickColor() },
+  { order: 4, startLat: 11.986597, startLng: 8.571831, endLat: -15.595412, endLng: -56.05918, arcAlt: 0.5, color: pickColor() },
+  { order: 4, startLat: -34.6037, startLng: -58.3816, endLat: 22.3193, endLng: 114.1694, arcAlt: 0.7, color: pickColor() },
+  { order: 4, startLat: 51.5072, startLng: -0.1276, endLat: 48.8566, endLng: -2.3522, arcAlt: 0.1, color: pickColor() },
+  { order: 5, startLat: 14.5995, startLng: 120.9842, endLat: 51.5072, endLng: -0.1276, arcAlt: 0.3, color: pickColor() },
+  { order: 5, startLat: 1.3521, startLng: 103.8198, endLat: -33.8688, endLng: 151.2093, arcAlt: 0.2, color: pickColor() },
+  { order: 5, startLat: 34.0522, startLng: -118.2437, endLat: 48.8566, endLng: -2.3522, arcAlt: 0.2, color: pickColor() },
+  { order: 6, startLat: -15.432563, startLng: 28.315853, endLat: 1.094136, endLng: -63.34546, arcAlt: 0.7, color: pickColor() },
+  { order: 6, startLat: 37.5665, startLng: 126.978, endLat: 35.6762, endLng: 139.6503, arcAlt: 0.1, color: pickColor() },
+  { order: 6, startLat: 22.3193, startLng: 114.1694, endLat: 51.5072, endLng: -0.1276, arcAlt: 0.3, color: pickColor() },
+  { order: 7, startLat: -19.885592, startLng: -43.951191, endLat: -15.595412, endLng: -56.05918, arcAlt: 0.1, color: pickColor() },
+  { order: 7, startLat: 48.8566, startLng: -2.3522, endLat: 52.52, endLng: 13.405, arcAlt: 0.1, color: pickColor() },
+  { order: 7, startLat: 52.52, startLng: 13.405, endLat: 34.0522, endLng: -118.2437, arcAlt: 0.2, color: pickColor() },
+  { order: 8, startLat: -8.833221, startLng: 13.264837, endLat: -33.936138, endLng: 18.436529, arcAlt: 0.2, color: pickColor() },
+  { order: 8, startLat: 49.2827, startLng: -123.1207, endLat: 52.3676, endLng: 4.9041, arcAlt: 0.2, color: pickColor() },
+  { order: 8, startLat: 1.3521, startLng: 103.8198, endLat: 40.7128, endLng: -74.006, arcAlt: 0.5, color: pickColor() },
+  { order: 9, startLat: 51.5072, startLng: -0.1276, endLat: 34.0522, endLng: -118.2437, arcAlt: 0.2, color: pickColor() },
+  { order: 9, startLat: 22.3193, startLng: 114.1694, endLat: -22.9068, endLng: -43.1729, arcAlt: 0.7, color: pickColor() },
+  { order: 9, startLat: 1.3521, startLng: 103.8198, endLat: -34.6037, endLng: -58.3816, arcAlt: 0.5, color: pickColor() },
+  { order: 10, startLat: -22.9068, startLng: -43.1729, endLat: 28.6139, endLng: 77.209, arcAlt: 0.7, color: pickColor() },
+  { order: 10, startLat: 34.0522, startLng: -118.2437, endLat: 31.2304, endLng: 121.4737, arcAlt: 0.3, color: pickColor() },
+  { order: 10, startLat: -6.2088, startLng: 106.8456, endLat: 52.3676, endLng: 4.9041, arcAlt: 0.3, color: pickColor() },
+  { order: 11, startLat: 41.9028, startLng: 12.4964, endLat: 34.0522, endLng: -118.2437, arcAlt: 0.2, color: pickColor() },
+  { order: 11, startLat: -6.2088, startLng: 106.8456, endLat: 31.2304, endLng: 121.4737, arcAlt: 0.2, color: pickColor() },
+  { order: 11, startLat: 22.3193, startLng: 114.1694, endLat: 1.3521, endLng: 103.8198, arcAlt: 0.2, color: pickColor() },
+  { order: 12, startLat: 34.0522, startLng: -118.2437, endLat: 37.7749, endLng: -122.4194, arcAlt: 0.1, color: pickColor() },
+  { order: 12, startLat: 35.6762, startLng: 139.6503, endLat: 22.3193, endLng: 114.1694, arcAlt: 0.2, color: pickColor() },
+  { order: 12, startLat: 22.3193, startLng: 114.1694, endLat: 34.0522, endLng: -118.2437, arcAlt: 0.3, color: pickColor() },
+  { order: 13, startLat: 52.52, startLng: 13.405, endLat: 22.3193, endLng: 114.1694, arcAlt: 0.3, color: pickColor() },
+  { order: 13, startLat: 11.986597, startLng: 8.571831, endLat: 35.6762, endLng: 139.6503, arcAlt: 0.3, color: pickColor() },
+  { order: 13, startLat: -22.9068, startLng: -43.1729, endLat: -34.6037, endLng: -58.3816, arcAlt: 0.1, color: pickColor() },
+  { order: 14, startLat: -33.936138, startLng: 18.436529, endLat: 21.395643, endLng: 39.883798, arcAlt: 0.3, color: pickColor() },
+];
 
 /* ── ClipPath Link Animation ──────────────────────────────── */
 const NO_CLIP = "polygon(0 0, 100% 0, 100% 100%, 0% 100%)";
@@ -19,16 +93,16 @@ type Side = "top" | "left" | "bottom" | "right";
 type KeyframeMap = { [key in Side]: string[] };
 
 const ENTRANCE_KEYFRAMES: KeyframeMap = {
-  left:   [BOTTOM_RIGHT_CLIP, NO_CLIP],
+  left: [BOTTOM_RIGHT_CLIP, NO_CLIP],
   bottom: [BOTTOM_RIGHT_CLIP, NO_CLIP],
-  top:    [BOTTOM_RIGHT_CLIP, NO_CLIP],
-  right:  [TOP_LEFT_CLIP,     NO_CLIP],
+  top: [BOTTOM_RIGHT_CLIP, NO_CLIP],
+  right: [TOP_LEFT_CLIP, NO_CLIP],
 };
 const EXIT_KEYFRAMES: KeyframeMap = {
-  left:   [NO_CLIP, TOP_RIGHT_CLIP],
+  left: [NO_CLIP, TOP_RIGHT_CLIP],
   bottom: [NO_CLIP, TOP_RIGHT_CLIP],
-  top:    [NO_CLIP, TOP_RIGHT_CLIP],
-  right:  [NO_CLIP, BOTTOM_LEFT_CLIP],
+  top: [NO_CLIP, TOP_RIGHT_CLIP],
+  right: [NO_CLIP, BOTTOM_LEFT_CLIP],
 };
 
 const ClipLinkBox = ({
@@ -39,9 +113,9 @@ const ClipLinkBox = ({
   const getNearestSide = (e: ReactMouseEvent): Side => {
     const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const sides = [
-      { proximity: Math.abs(box.left   - e.clientX), side: "left"   as Side },
-      { proximity: Math.abs(box.right  - e.clientX), side: "right"  as Side },
-      { proximity: Math.abs(box.top    - e.clientY), side: "top"    as Side },
+      { proximity: Math.abs(box.left - e.clientX), side: "left" as Side },
+      { proximity: Math.abs(box.right - e.clientX), side: "right" as Side },
+      { proximity: Math.abs(box.top - e.clientY), side: "top" as Side },
       { proximity: Math.abs(box.bottom - e.clientY), side: "bottom" as Side },
     ];
     return sides.sort((a, b) => a.proximity - b.proximity)[0].side;
@@ -84,24 +158,24 @@ const ClipLinkBox = ({
 const TODAY = new Date().getDay(); // 0 = Sunday
 
 const HOURS = [
-  { day: "Monday",    dayIdx: 1, hours: "8:00 AM – 9:00 PM" },
-  { day: "Tuesday",   dayIdx: 2, hours: "8:00 AM – 9:00 PM" },
+  { day: "Monday", dayIdx: 1, hours: "8:00 AM – 9:00 PM" },
+  { day: "Tuesday", dayIdx: 2, hours: "8:00 AM – 9:00 PM" },
   { day: "Wednesday", dayIdx: 3, hours: "8:00 AM – 9:00 PM" },
-  { day: "Thursday",  dayIdx: 4, hours: "8:00 AM – 9:00 PM" },
-  { day: "Friday",    dayIdx: 5, hours: "8:00 AM – 8:00 PM" },
-  { day: "Saturday",  dayIdx: 6, hours: "10:00 AM – 6:00 PM" },
-  { day: "Sunday",    dayIdx: 0, hours: "12:00 PM – 5:00 PM" },
+  { day: "Thursday", dayIdx: 4, hours: "8:00 AM – 9:00 PM" },
+  { day: "Friday", dayIdx: 5, hours: "8:00 AM – 8:00 PM" },
+  { day: "Saturday", dayIdx: 6, hours: "10:00 AM – 6:00 PM" },
+  { day: "Sunday", dayIdx: 0, hours: "12:00 PM – 5:00 PM" },
 ];
 
 
 
 const SOCIALS = [
-  { label: "Twitter / X",  icon: Twitter,   handle: "@LibraVault",      href: "#" },
-  { label: "Instagram",    icon: Instagram, handle: "@libravault.lib",  href: "#" },
-  { label: "Facebook",     icon: Facebook,  handle: "LibraVault",       href: "#" },
-  { label: "LinkedIn",     icon: Linkedin,  handle: "LibraVault Org",   href: "#" },
-  { label: "YouTube",      icon: Youtube,   handle: "LibraVault",       href: "#" },
-  { label: "Website",      icon: Globe,     handle: "libravault.org",   href: "#" },
+  { label: "Twitter / X", icon: Twitter, handle: "@LibraVault", href: "#" },
+  { label: "Instagram", icon: Instagram, handle: "@libravault.lib", href: "#" },
+  { label: "Facebook", icon: Facebook, handle: "LibraVault", href: "#" },
+  { label: "LinkedIn", icon: Linkedin, handle: "LibraVault Org", href: "#" },
+  { label: "YouTube", icon: Youtube, handle: "LibraVault", href: "#" },
+  { label: "Website", icon: Globe, handle: "libravault.org", href: "#" },
 ];
 
 const fadeUp = {
@@ -130,36 +204,53 @@ const ContactSection = () => {
     <div id="contact" className="space-y-0">
 
       {/* ── 1. Hero Contact Header ─────────────────────────── */}
-      <section className="py-24 px-6 bg-foreground text-background overflow-hidden relative">
-        <div className="absolute inset-0 opacity-5 pointer-events-none"
-          style={{ backgroundImage: "repeating-linear-gradient(0deg,transparent,transparent 40px,currentColor 40px,currentColor 42px),repeating-linear-gradient(90deg,transparent,transparent 40px,currentColor 40px,currentColor 42px)" }}
+      <section className="py-24 px-6 bg-white text-foreground overflow-hidden relative min-h-[600px]">
+        <div className="absolute inset-0 pointer-events-none"
+          style={{ backgroundImage: "repeating-linear-gradient(0deg,transparent,transparent 40px,#e5e7eb 40px,#e5e7eb 42px),repeating-linear-gradient(90deg,transparent,transparent 40px,#e5e7eb 40px,#e5e7eb 42px)" }}
         />
         <div className="container mx-auto relative z-10">
-          <motion.div
-            className="max-w-3xl"
-            initial="hidden" whileInView="show" viewport={{ once: true }}
-            variants={stagger}
-          >
-            <motion.p variants={fadeUp} className="font-heading font-bold text-primary text-sm tracking-[0.3em] uppercase mb-4">
-              LibraVault — Contact
-            </motion.p>
-            <motion.h2 variants={fadeUp} className="font-heading text-6xl md:text-8xl font-black leading-none mb-6">
-              LET'S<br />
-              <span className="text-primary">TALK.</span>
-            </motion.h2>
-            <motion.p variants={fadeUp} className="font-body text-xl text-background/70 max-w-xl mb-10">
-              Have a question, a suggestion, or just want to say hello? Our team is here and ready to help — every single day.
-            </motion.p>
-            <motion.div variants={fadeUp} className="flex flex-wrap gap-4">
-              <a href="#contact-form" className="brutal-btn bg-primary text-primary-foreground rounded-md font-heading inline-flex items-center gap-2">
-                Send Us a Message <ArrowRight className="w-5 h-5" />
-              </a>
-              <a href="tel:+15550100000" className="brutal-btn bg-background text-foreground rounded-md font-heading inline-flex items-center gap-2"
-                style={{ border: "2px solid hsl(var(--background))" }}>
-                <Phone className="w-5 h-5" /> Call Now
-              </a>
+          <div className="flex flex-col lg:flex-row items-center gap-8">
+            {/* Left — Text */}
+            <motion.div
+              className="w-full lg:w-1/2 max-w-2xl"
+              initial="hidden" whileInView="show" viewport={{ once: true }}
+              variants={stagger}
+            >
+              <motion.p variants={fadeUp} className="font-heading font-bold text-primary text-sm tracking-[0.3em] uppercase mb-4">
+                LibraVault — Contact
+              </motion.p>
+              <motion.h2 variants={fadeUp} className="font-heading text-6xl md:text-8xl font-black leading-none mb-6">
+                LET'S<br />
+                <span className="text-primary">TALK.</span>
+              </motion.h2>
+              <motion.p variants={fadeUp} className="font-body text-xl text-foreground/70 max-w-xl mb-10">
+                Have a question, a suggestion, or just want to say hello? Our team is here and ready to help — every single day.
+              </motion.p>
+              <motion.div variants={fadeUp} className="flex flex-wrap gap-4">
+                <a href="#contact-form" className="brutal-btn bg-primary text-primary-foreground rounded-md font-heading inline-flex items-center gap-2">
+                  Send Us a Message <ArrowRight className="w-5 h-5" />
+                </a>
+                <a href="tel:+15550100000" className="brutal-btn bg-background text-foreground rounded-md font-heading inline-flex items-center gap-2"
+                  style={{ border: "2px solid hsl(var(--foreground))" }}>
+                  <Phone className="w-5 h-5" /> Call Now
+                </a>
+              </motion.div>
             </motion.div>
-          </motion.div>
+
+            {/* Right — Globe */}
+            <div className="w-full lg:w-1/2 relative h-[350px] sm:h-[450px] md:h-[500px] lg:h-[550px]">
+              <div className="absolute w-full h-full z-10">
+                <Suspense fallback={
+                  <div className="w-full h-full flex items-center justify-center">
+                    <div className="w-16 h-16 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+                  </div>
+                }>
+                  <LazyWorld data={SAMPLE_ARCS} globeConfig={GLOBE_CONFIG} />
+                </Suspense>
+              </div>
+              <div className="absolute w-full bottom-0 inset-x-0 h-40 bg-gradient-to-b pointer-events-none select-none from-transparent to-transparent z-20" />
+            </div>
+          </div>
         </div>
       </section>
 
@@ -168,10 +259,10 @@ const ContactSection = () => {
         <div className="container mx-auto">
           <div className="flex flex-wrap items-center justify-center gap-8 text-primary-foreground">
             {[
-              { icon: Clock,        label: "Reply within 24 hours" },
-              { icon: CheckCircle,  label: "Expert team available" },
-              { icon: Headphones,   label: "Dedicated support line" },
-              { icon: Mail,         label: "Email response guaranteed" },
+              { icon: Clock, label: "Reply within 24 hours" },
+              { icon: CheckCircle, label: "Expert team available" },
+              { icon: Headphones, label: "Dedicated support line" },
+              { icon: Mail, label: "Email response guaranteed" },
             ].map(({ icon: Icon, label }) => (
               <div key={label} className="flex items-center gap-2 font-heading font-bold">
                 <Icon className="w-5 h-5" />
@@ -196,9 +287,9 @@ const ContactSection = () => {
             initial="hidden" whileInView="show" viewport={{ once: true }} variants={stagger}
           >
             {[
-              { icon: Phone,  title: "Call Us",   detail: "+1 (555) 010-0000",    sub: "Mon–Fri, 8 AM – 9 PM",     color: "bg-primary",   href: "tel:+15550100000" },
-              { icon: Mail,   title: "Email Us",  detail: "hello@libravault.org", sub: "We reply within 24 hours", color: "bg-secondary", href: "mailto:hello@libravault.org" },
-              { icon: MapPin, title: "Visit Us",  detail: "42 Library Lane, NY",  sub: "Open 7 days a week",       color: "bg-accent",    href: "#map" },
+              { icon: Phone, title: "Call Us", detail: "+1 (555) 010-0000", sub: "Mon–Fri, 8 AM – 9 PM", color: "bg-primary", href: "tel:+15550100000" },
+              { icon: Mail, title: "Email Us", detail: "hello@libravault.org", sub: "We reply within 24 hours", color: "bg-secondary", href: "mailto:hello@libravault.org" },
+              { icon: MapPin, title: "Visit Us", detail: "Nanganallur, Chennai", sub: "Open 7 days a week", color: "bg-accent", href: "#map" },
             ].map(({ icon: Icon, title, detail, sub, color, href }) => (
               <motion.a
                 key={title}
@@ -343,7 +434,7 @@ const ContactSection = () => {
               <div className="brutal-card rounded-lg overflow-hidden" style={{ height: 380 }}>
                 <iframe
                   title="LibraVault Location"
-                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3022.215256803!2d-73.98566!3d40.74844!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x89c259a9aeb1c6b5%3A0x35b1cfbc89a6097f!2sNew%20York%20Public%20Library!5e0!3m2!1sen!2sus!4v1700000000000"
+                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3887.610565863953!2d80.19233621430487!3d12.99041281784534!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3a525d883b6b7a69%3A0xd64f43472097e3z3!2sNanganallur%2C%20Chennai%2C%20Tamil%20Nadu!5e0!3m2!1sen!2sin!4v1700000000000"
                   width="100%"
                   height="100%"
                   style={{ border: 0, display: "block" }}
@@ -363,7 +454,7 @@ const ContactSection = () => {
                 {
                   icon: MapPin,
                   title: "Address",
-                  lines: ["42 Library Lane", "New York, NY 10018"],
+                  lines: ["Nanganullur", "Chennai, Tamil Nadu"],
                 },
                 {
                   icon: Clock,
@@ -374,11 +465,6 @@ const ContactSection = () => {
                   icon: Users,
                   title: "Accessibility",
                   lines: ["Wheelchair ramp at main entrance", "Elevator to all floors", "Hearing loop available"],
-                },
-                {
-                  icon: BookOpen,
-                  title: "Floor Guide",
-                  lines: ["G: Reception & Lending", "1F: Fiction & Children's", "2F: Research & Non-Fiction", "3F: Quiet Study Rooms"],
                 },
               ].map(({ icon: Icon, title, lines }) => (
                 <motion.div key={title} variants={fadeUp} className="brutal-card p-4 rounded-lg">

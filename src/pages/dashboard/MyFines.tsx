@@ -1,11 +1,20 @@
 import { motion } from "framer-motion";
 import { CreditCard, AlertTriangle, Loader2 } from "lucide-react";
-import { useMyBorrows } from "@/hooks/useLibraryData";
+import { useMyBorrows, usePayFine } from "@/hooks/useLibraryData";
+import { toast } from "sonner";
 
 const MyFines = () => {
   const { data: borrows = [], isLoading } = useMyBorrows();
+  const payMutation = usePayFine();
   const fines = borrows.filter((b) => b.fineAmount > 0);
   const totalFine = fines.reduce((sum, b) => sum + b.fineAmount, 0);
+
+  const handlePay = (borrowId: string) => {
+    payMutation.mutate(borrowId, {
+      onSuccess: () => toast.success("Fine paid successfully!"),
+      onError: (err: any) => toast.error(err.message || "Failed to pay fine"),
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -47,8 +56,12 @@ const MyFines = () => {
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="font-heading text-xl font-black text-destructive">${b.fineAmount.toFixed(2)}</span>
-                  <button className="brutal-btn bg-primary text-primary-foreground rounded-md text-sm font-heading">
-                    Pay
+                  <button
+                    onClick={() => handlePay(b.id)}
+                    disabled={payMutation.isPending}
+                    className="brutal-btn bg-primary text-primary-foreground rounded-md text-sm font-heading disabled:opacity-50"
+                  >
+                    {payMutation.isPending && payMutation.variables === b.id ? "Paying..." : "Pay"}
                   </button>
                 </div>
               </motion.div>

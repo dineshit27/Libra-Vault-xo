@@ -21,6 +21,8 @@ type DomeGalleryProps = {
   imageBorderRadius?: string;
   openedImageBorderRadius?: string;
   grayscale?: boolean;
+  autoRotate?: boolean;
+  autoRotateSpeed?: number;
 };
 
 type ItemDef = {
@@ -33,34 +35,13 @@ type ItemDef = {
 };
 
 const DEFAULT_IMAGES: ImageItem[] = [
-  {
-    src: 'https://images.unsplash.com/photo-1755331039789-7e5680e26e8f?q=80&w=774&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-    alt: 'Abstract art'
-  },
-  {
-    src: 'https://images.unsplash.com/photo-1755569309049-98410b94f66d?q=80&w=772&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-    alt: 'Modern sculpture'
-  },
-  {
-    src: 'https://images.unsplash.com/photo-1755497595318-7e5e3523854f?q=80&w=774&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-    alt: 'Digital artwork'
-  },
-  {
-    src: 'https://images.unsplash.com/photo-1755353985163-c2a0fe5ac3d8?q=80&w=774&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-    alt: 'Contemporary art'
-  },
-  {
-    src: 'https://images.unsplash.com/photo-1745965976680-d00be7dc0377?q=80&w=774&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-    alt: 'Geometric pattern'
-  },
-  {
-    src: 'https://images.unsplash.com/photo-1752588975228-21f44630bb3c?q=80&w=774&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-    alt: 'Textured surface'
-  },
-  {
-    src: 'https://pbs.twimg.com/media/Gyla7NnXMAAXSo_?format=jpg&name=large',
-    alt: 'Social media image'
-  }
+  { src: "https://i.pinimg.com/1200x/dd/81/cf/dd81cf3d8cfdbb4397f74beab6de55d9.jpg", alt: "Book 1" },
+  { src: "https://i.pinimg.com/1200x/b9/6b/93/b96b93a8866869e8f232835bebed2b15.jpg", alt: "Book 2" },
+  { src: "https://i.pinimg.com/1200x/45/10/24/4510246f0f4ba2f7c3117335b4c622b8.jpg", alt: "Book 3" },
+  { src: "https://i.pinimg.com/1200x/b2/96/9e/b2969ea4cee2a260bf0645436ad11f05.jpg", alt: "Book 4" },
+  { src: "https://i.pinimg.com/736x/9e/fb/ba/9efbba81edcfaadb12c654bcdd996498.jpg", alt: "Book 5" },
+  { src: "https://i.pinimg.com/736x/0a/cf/15/0acf15493fe0abe5d4b976b4fd81a15a.jpg", alt: "Book 6" },
+  { src: "https://i.pinimg.com/736x/85/4c/b2/854cb273bcfcd6e3f59d3dda953f90cb.jpg", alt: "Book 7" },
 ];
 
 const DEFAULTS = {
@@ -155,7 +136,9 @@ export default function DomeGallery({
   openedImageHeight = '400px',
   imageBorderRadius = '30px',
   openedImageBorderRadius = '30px',
-  grayscale = true
+  grayscale = true,
+  autoRotate = true,
+  autoRotateSpeed = 0.1
 }: DomeGalleryProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLDivElement>(null);
@@ -199,12 +182,30 @@ export default function DomeGallery({
 
   const items = useMemo(() => buildItems(images, segments), [images, segments]);
 
-  const applyTransform = (xDeg: number, yDeg: number) => {
+  const applyTransform = useCallback((xDeg: number, yDeg: number) => {
     const el = sphereRef.current;
     if (el) {
       el.style.transform = `translateZ(calc(var(--radius) * -1)) rotateX(${xDeg}deg) rotateY(${yDeg}deg)`;
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    let animationFrameId: number;
+    let lastTime = performance.now();
+    const animate = (time: number) => {
+      const delta = time - lastTime;
+      lastTime = time;
+      if (autoRotate && !draggingRef.current && !openingRef.current) {
+        rotationRef.current.y -= autoRotateSpeed * (delta / 16.66);
+        applyTransform(rotationRef.current.x, rotationRef.current.y);
+      }
+      animationFrameId = requestAnimationFrame(animate);
+    };
+    if (autoRotate) {
+      animationFrameId = requestAnimationFrame(animate);
+    }
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [autoRotate, autoRotateSpeed, applyTransform]);
 
   const lockedRadiusRef = useRef<number | null>(null);
 
@@ -437,7 +438,24 @@ export default function DomeGallery({
       if (!el) return;
       const parent = el.parentElement as HTMLElement;
       const overlay = viewerRef.current?.querySelector('.enlarge') as HTMLElement | null;
-      if (!overlay) return;
+      if (!overlay) {
+        // Emergency reset — overlay was already removed but state is still locked
+        const refDiv = parent.querySelector('.item__image--reference') as HTMLElement | null;
+        if (refDiv) try { refDiv.remove(); } catch (_) { }
+        parent.style.setProperty('--rot-y-delta', `0deg`);
+        parent.style.setProperty('--rot-x-delta', `0deg`);
+        el.style.visibility = '';
+        el.style.opacity = '';
+        el.style.transition = '';
+        (el.style as any).zIndex = 0;
+        el.removeAttribute('data-focused');
+        focusedElRef.current = null;
+        originalTilePositionRef.current = null;
+        rootRef.current?.removeAttribute('data-enlarging');
+        openingRef.current = false;
+        document.body.classList.remove('dg-scroll-lock');
+        return;
+      }
 
       const refDiv = parent.querySelector('.item__image--reference') as HTMLElement | null;
 
@@ -488,7 +506,7 @@ export default function DomeGallery({
         pointer-events: none;
         margin: 0;
         transform: none;
-        filter: ${grayscale ? 'grayscale(1)' : 'none'};
+        filter: none;
       `;
 
       const originalImg = overlay.querySelector('img');
@@ -511,39 +529,40 @@ export default function DomeGallery({
         animatingOverlay.style.opacity = '0';
       });
 
+      let cleanedUp = false;
       const cleanup = () => {
-        animatingOverlay.remove();
+        if (cleanedUp) return;
+        cleanedUp = true;
+
+        try { animatingOverlay.remove(); } catch (_) { }
         originalTilePositionRef.current = null;
 
-        if (refDiv) refDiv.remove();
+        if (refDiv) try { refDiv.remove(); } catch (_) { }
         parent.style.transition = 'none';
         el.style.transition = 'none';
 
         parent.style.setProperty('--rot-y-delta', `0deg`);
         parent.style.setProperty('--rot-x-delta', `0deg`);
 
+        el.style.visibility = '';
+        el.style.opacity = '0';
+        (el.style as any).zIndex = 0;
+        focusedElRef.current = null;
+        el.removeAttribute('data-focused');
+        rootRef.current?.removeAttribute('data-enlarging');
+
         requestAnimationFrame(() => {
-          el.style.visibility = '';
-          el.style.opacity = '0';
-          (el.style as any).zIndex = 0;
-          focusedElRef.current = null;
-          rootRef.current?.removeAttribute('data-enlarging');
+          parent.style.transition = '';
+          el.style.transition = 'opacity 300ms ease-out';
 
           requestAnimationFrame(() => {
-            parent.style.transition = '';
-            el.style.transition = 'opacity 300ms ease-out';
-
-            requestAnimationFrame(() => {
-              el.style.opacity = '1';
-              setTimeout(() => {
-                el.style.transition = '';
-                el.style.opacity = '';
-                openingRef.current = false;
-                if (!draggingRef.current && rootRef.current?.getAttribute('data-enlarging') !== 'true') {
-                  document.body.classList.remove('dg-scroll-lock');
-                }
-              }, 300);
-            });
+            el.style.opacity = '1';
+            setTimeout(() => {
+              el.style.transition = '';
+              el.style.opacity = '';
+              openingRef.current = false;
+              document.body.classList.remove('dg-scroll-lock');
+            }, 300);
           });
         });
       };
@@ -551,6 +570,8 @@ export default function DomeGallery({
       animatingOverlay.addEventListener('transitionend', cleanup, {
         once: true
       });
+      // Fallback: guarantee cleanup runs even if transitionend never fires
+      setTimeout(cleanup, enlargeTransitionMs + 100);
     };
 
     scrim.addEventListener('click', close);
@@ -620,7 +641,7 @@ export default function DomeGallery({
     const img = document.createElement('img');
     img.src = rawSrc;
     img.alt = rawAlt;
-    img.style.cssText = `width:100%; height:100%; object-fit:cover; filter:${grayscale ? 'grayscale(1)' : 'none'};`;
+    img.style.cssText = `width:100%; height:100%; object-fit:cover; filter:none;`;
     overlay.appendChild(img);
     viewerRef.current!.appendChild(overlay);
     const tx0 = tileR.left - frameR.left;
@@ -915,6 +936,14 @@ export default function DomeGallery({
           </div>
         </main>
       </div>
+      <style>{`
+        .item__image img {
+          transition: filter 0.3s ease-in-out !important;
+        }
+        .item__image:hover img {
+          filter: grayscale(0) !important;
+        }
+      `}</style>
     </>
   );
 }

@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { BookOpen, AlertTriangle, CheckCircle, Clock, Loader2 } from "lucide-react";
-import { useMyBorrows } from "@/hooks/useLibraryData";
+import { useMyBorrows, useReturnBook } from "@/hooks/useLibraryData";
+import { toast } from "sonner";
 
 const tabs = ["Active", "History", "Overdue"] as const;
 
@@ -11,6 +12,21 @@ const item = { hidden: { opacity: 0, x: -20 }, show: { opacity: 1, x: 0 } };
 const MyBorrows = () => {
   const [tab, setTab] = useState<typeof tabs[number]>("Active");
   const { data: borrows = [], isLoading } = useMyBorrows();
+  const returnMutation = useReturnBook();
+
+  const handleReturn = (borrowId: string, bookId: string) => {
+    returnMutation.mutate(
+      { borrowId, bookId },
+      {
+        onSuccess: () => {
+          toast.success("Book returned successfully!");
+        },
+        onError: (error: any) => {
+          toast.error(error.message || "Failed to return book");
+        },
+      }
+    );
+  };
 
   const filtered = borrows.filter((b) => {
     if (tab === "Active") return b.status === "active";
@@ -70,7 +86,14 @@ const MyBorrows = () => {
                   </span>
                 )}
                 {b.status === "active" && (
-                  <button className="brutal-btn bg-primary text-primary-foreground rounded-md text-xs px-3 py-1 font-heading">
+                  <button
+                    onClick={() => handleReturn(b.id, b.bookId)}
+                    disabled={returnMutation.isPending}
+                    className="brutal-btn bg-primary text-primary-foreground rounded-md text-xs px-3 py-1 font-heading disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    {returnMutation.isPending && returnMutation.variables?.borrowId === b.id && (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    )}
                     Return
                   </button>
                 )}

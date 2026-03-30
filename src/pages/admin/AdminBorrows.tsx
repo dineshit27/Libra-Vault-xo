@@ -2,6 +2,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { Search, CheckCircle, AlertTriangle, RotateCcw, Loader2 } from "lucide-react";
 import { useAdminAllBorrows, useUpdateBorrowStatus } from "@/hooks/useLibraryData";
+import { toast } from "sonner";
 
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.05 } } };
 const item = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } };
@@ -10,6 +11,16 @@ const AdminBorrows = () => {
   const [search, setSearch] = useState("");
   const { data: borrows = [], isLoading } = useAdminAllBorrows();
   const updateStatus = useUpdateBorrowStatus();
+
+  const handleStatusUpdate = (id: string, status: "active" | "overdue" | "returned") => {
+    updateStatus.mutate(
+      { id, status },
+      {
+        onSuccess: () => toast.success(`Status updated to ${status}`),
+        onError: (err: any) => toast.error(err.message || "Update failed"),
+      }
+    );
+  };
 
   const filtered = borrows.filter((b: any) =>
     b.bookTitle?.toLowerCase().includes(search.toLowerCase()) || 
@@ -66,18 +77,18 @@ const AdminBorrows = () => {
                         <div className="flex gap-2">
                           <button
                             title="Mark as returned"
-                            onClick={() => updateStatus.mutate({ id: borrow.id, status: "returned" })}
+                            onClick={() => handleStatusUpdate(borrow.id, "returned")}
                             disabled={updateStatus.isPending}
-                            className="brutal-btn bg-success text-success-foreground rounded-md p-1.5"
+                            className="brutal-btn bg-success text-success-foreground rounded-md p-1.5 disabled:opacity-50"
                           >
                             <CheckCircle className="w-4 h-4" />
                           </button>
                           {borrow.status === 'active' && (
                             <button
                               title="Mark as overdue"
-                              onClick={() => updateStatus.mutate({ id: borrow.id, status: "overdue" })}
+                              onClick={() => handleStatusUpdate(borrow.id, "overdue")}
                               disabled={updateStatus.isPending}
-                              className="brutal-btn bg-destructive text-destructive-foreground rounded-md p-1.5"
+                              className="brutal-btn bg-destructive text-destructive-foreground rounded-md p-1.5 disabled:opacity-50"
                             >
                               <AlertTriangle className="w-4 h-4" />
                             </button>

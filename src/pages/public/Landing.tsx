@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
+import { motion, useMotionValue, useSpring, useTransform, useScroll, useMotionValueEvent } from "framer-motion";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 
@@ -500,10 +500,28 @@ const Landing = () => {
   const booksCount = useCountUp(12500);
   const membersCount = useCountUp(3200);
   const borrowsCount = useCountUp(45000);
+
+  const { scrollY } = useScroll();
+  const [navVisible, setNavVisible] = useState(true);
+
+  useMotionValueEvent(scrollY, "change", (latest) => {
+    // Hide navbar after scrolling down 600px (roughly past the Hero section)
+    if (latest > 600) {
+      setNavVisible(false);
+    } else {
+      setNavVisible(true);
+    }
+  });
+
   return (
     <div className="min-h-screen bg-background">
       {/* Navbar */}
-      <nav className="fixed top-0 w-full z-50 bg-background/95 backdrop-blur brutal-border border-t-0 border-x-0">
+      <motion.nav 
+        initial={{ y: 0 }}
+        animate={{ y: navVisible ? 0 : "-100%" }}
+        transition={{ duration: 0.3, ease: "easeInOut" }}
+        className="fixed top-0 w-full z-50 bg-background/95 backdrop-blur brutal-border border-t-0 border-x-0"
+      >
         <div className="container mx-auto flex items-center justify-between py-4 px-6">
           <Link to="/" className="flex items-center gap-2">
             <Library className="w-6 h-6 md:w-8 md:h-8" />
@@ -524,7 +542,7 @@ const Landing = () => {
             </Link>
           </div>
         </div>
-      </nav>
+      </motion.nav>
 
       {/* Hero */}
       <section className="pt-32 pb-20 px-6 overflow-hidden">

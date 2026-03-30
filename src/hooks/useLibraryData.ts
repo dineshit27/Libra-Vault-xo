@@ -461,6 +461,49 @@ export function useBorrowBook() {
   });
 }
 
+export function useReturnBook() {
+  const queryClient = useQueryClient();
+  const user = useAuthStore((s) => s.user);
+  const isGuest = useIsGuest();
+
+  return useMutation({
+    mutationFn: async ({ borrowId, bookId }: { borrowId: string; bookId: string }) => {
+      if (isGuest) return; // Mock data is static
+      
+      if (!user) throw new Error("Must be logged in to return");
+
+      const { error: borrowErr } = await supabase
+        .from("borrows")
+        .update({ 
+          status: "returned", 
+          returned_at: new Date().toISOString().split("T")[0] 
+        })
+        .eq("id", borrowId);
+      
+      if (borrowErr) throw borrowErr;
+
+      const { data: book, error: bookFetchErr } = await supabase
+        .from("books")
+        .select("available_copies")
+        .eq("id", bookId)
+        .single();
+      
+      if (bookFetchErr) throw bookFetchErr;
+
+      const { error: bookErr } = await supabase
+        .from("books")
+        .update({ available_copies: (book.available_copies || 0) + 1 })
+        .eq("id", bookId);
+      
+      if (bookErr) throw bookErr;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["borrows", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["books"] });
+    }
+  });
+}
+
 export function useReserveBook() {
   const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
@@ -482,6 +525,109 @@ export function useReserveBook() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["reservations"] });
+    }
+  });
+}
+
+export function useCancelReservation() {
+  const queryClient = useQueryClient();
+  const user = useAuthStore((s) => s.user);
+  const isGuest = useIsGuest();
+
+  return useMutation({
+    mutationFn: async (reservationId: string) => {
+      if (isGuest) return;
+      if (!user) throw new Error("Must be logged in to cancel reservation");
+
+      const { error } = await supabase
+        .from("reservations")
+        .update({ status: "cancelled" })
+        .eq("id", reservationId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reservations", user?.id] });
+    }
+  });
+}
+
+export function usePickUpBook() {
+  const queryClient = useQueryClient();
+  const user = useAuthStore((s) => s.user);
+  const isGuest = useIsGuest();
+
+  return useMutation({
+    mutationFn: async ({ reservationId, bookId, bookTitle, bookAuthor }: { reservationId: string; bookId: string; bookTitle: string; bookAuthor: string }) => {
+      if (isGuest) return;
+      if (!user) throw new Error("Must be logged in to pick up book");
+
+      // 1. Fulfil reservation
+      const { error: resErr } = await supabase
+        .from("reservations")
+        .update({ status: "fulfilled" })
+        .eq("id", reservationId);
+      
+      if (resErr) throw resErr;
+
+      // 2. Create borrow
+      const dueDate = new Date();
+      dueDate.setDate(dueDate.getDate() + 14);
+      
+      const { error: borrowErr } = await supabase.from("borrows").insert({
+        user_id: user.id,
+        book_id: bookId,
+        book_title: bookTitle,
+        book_author: bookAuthor,
+        due_date: dueDate.toISOString().split("T")[0],
+        status: "active"
+      });
+      
+      if (borrowErr) throw borrowErr;
+      
+      // 3. Decrement copies (since it wasn't decremented during reservation)
+      const { data: book, error: bookFetchErr } = await supabase
+        .from("books")
+        .select("available_copies")
+        .eq("id", bookId)
+        .single();
+      
+      if (bookFetchErr) throw bookFetchErr;
+
+      const { error: bookErr } = await supabase
+        .from("books")
+        .update({ available_copies: (book.available_copies || 1) - 1 })
+        .eq("id", bookId);
+      
+      if (bookErr) throw bookErr;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reservations", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["borrows", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["books"] });
+    }
+  });
+}
+
+export function usePayFine() {
+  const queryClient = useQueryClient();
+  const user = useAuthStore((s) => s.user);
+  const isGuest = useIsGuest();
+
+  return useMutation({
+    mutationFn: async (borrowId: string) => {
+      if (isGuest) return;
+      if (!user) throw new Error("Must be logged in to pay fines");
+
+      const { error } = await supabase
+        .from("borrows")
+        .update({ fine_amount: 0 })
+        .eq("id", borrowId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["borrows", user?.id] });
     }
   });
 }
@@ -577,18 +723,46 @@ export function useAdminAllBorrows() {
 
 export function useUpdateBorrowStatus() {
   const queryClient = useQueryClient();
+  const isGuest = useIsGuest();
+
   return useMutation({
     mutationFn: async ({ id, status, fineAmount }: { id: string; status: "active" | "overdue" | "returned"; fineAmount?: number }) => {
+      if (isGuest) return;
+
       const updateData: any = { status };
       if (status === "returned") updateData.returned_at = new Date().toISOString().split("T")[0];
       if (fineAmount !== undefined) updateData.fine_amount = fineAmount;
       
+      const { data: borrow, error: fetchErr } = await supabase
+        .from("borrows")
+        .select("book_id")
+        .eq("id", id)
+        .single();
+      
+      if (fetchErr) throw fetchErr;
+
       const { error } = await supabase.from("borrows").update(updateData).eq("id", id);
       if (error) throw error;
+
+      if (status === "returned") {
+        const { data: book, error: bookFetchErr } = await supabase
+          .from("books")
+          .select("available_copies")
+          .eq("id", borrow.book_id)
+          .single();
+        
+        if (!bookFetchErr && book) {
+          await supabase
+            .from("books")
+            .update({ available_copies: (book.available_copies || 0) + 1 })
+            .eq("id", borrow.book_id);
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-all-borrows"] });
       queryClient.invalidateQueries({ queryKey: ["admin-activity"] });
+      queryClient.invalidateQueries({ queryKey: ["books"] });
     },
   });
 }
@@ -623,13 +797,54 @@ export function useAdminAllReservations() {
 
 export function useUpdateReservationStatus() {
   const queryClient = useQueryClient();
+  const isGuest = useIsGuest();
+
   return useMutation({
     mutationFn: async ({ id, status }: { id: string; status: "pending" | "ready" | "cancelled" | "fulfilled" }) => {
+      if (isGuest) return;
+
+      const { data: res, error: fetchErr } = await supabase
+        .from("reservations")
+        .select("*")
+        .eq("id", id)
+        .single();
+      
+      if (fetchErr) throw fetchErr;
+
       const { error } = await supabase.from("reservations").update({ status }).eq("id", id);
       if (error) throw error;
+
+      if (status === "fulfilled") {
+        const dueDate = new Date();
+        dueDate.setDate(dueDate.getDate() + 14);
+        
+        await supabase.from("borrows").insert({
+          user_id: res.user_id,
+          book_id: res.book_id,
+          book_title: res.book_title,
+          book_author: "Unknown Author",
+          due_date: dueDate.toISOString().split("T")[0],
+          status: "active"
+        });
+
+        const { data: book, error: bookFetchErr } = await supabase
+          .from("books")
+          .select("available_copies")
+          .eq("id", res.book_id)
+          .single();
+        
+        if (!bookFetchErr && book) {
+          await supabase
+            .from("books")
+            .update({ available_copies: (book.available_copies || 1) - 1 })
+            .eq("id", res.book_id);
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-all-reservations"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-all-borrows"] });
+      queryClient.invalidateQueries({ queryKey: ["books"] });
     },
   });
 }

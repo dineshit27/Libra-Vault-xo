@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { Clock, CheckCircle, XCircle, BookOpen, Loader2 } from "lucide-react";
-import { useMyReservations } from "@/hooks/useLibraryData";
+import { useMyReservations, useCancelReservation, usePickUpBook } from "@/hooks/useLibraryData";
+import { toast } from "sonner";
 
 const statusConfig = {
   pending: { icon: Clock, color: "bg-accent text-accent-foreground", label: "Pending" },
@@ -14,6 +15,28 @@ const item = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } };
 
 const MyReservations = () => {
   const { data: reservations = [], isLoading } = useMyReservations();
+  const cancelMutation = useCancelReservation();
+  const pickUpMutation = usePickUpBook();
+
+  const handleCancel = (id: string) => {
+    cancelMutation.mutate(id, {
+      onSuccess: () => toast.success("Reservation cancelled"),
+      onError: (err: any) => toast.error(err.message || "Failed to cancel"),
+    });
+  };
+
+  const handlePickUp = (r: any) => {
+    pickUpMutation.mutate({
+      reservationId: r.id,
+      bookId: r.bookId,
+      bookTitle: r.bookTitle,
+      bookAuthor: "Unknown Author", // bookAuthor is not in reservation record, but we could fetch it if needed. 
+      // For now using placeholder as the reservation record seems to lack it in mapReservation but we could adjust mapReservation.
+    }, {
+      onSuccess: () => toast.success("Book picked up! Check My Borrows."),
+      onError: (err: any) => toast.error(err.message || "Failed to pick up"),
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -55,13 +78,21 @@ const MyReservations = () => {
                     <Icon className="w-3 h-3" /> {config.label}
                   </span>
                   {r.status === "pending" && (
-                    <button className="brutal-btn bg-destructive text-destructive-foreground rounded-md text-xs px-3 py-1 font-heading">
-                      Cancel
+                    <button
+                      onClick={() => handleCancel(r.id)}
+                      disabled={cancelMutation.isPending}
+                      className="brutal-btn bg-destructive text-destructive-foreground rounded-md text-xs px-3 py-1 font-heading disabled:opacity-50"
+                    >
+                      {cancelMutation.isPending && cancelMutation.variables === r.id ? "Cancelling..." : "Cancel"}
                     </button>
                   )}
                   {r.status === "ready" && (
-                    <button className="brutal-btn bg-primary text-primary-foreground rounded-md text-xs px-3 py-1 font-heading">
-                      Pick Up
+                    <button
+                      onClick={() => handlePickUp(r)}
+                      disabled={pickUpMutation.isPending}
+                      className="brutal-btn bg-primary text-primary-foreground rounded-md text-xs px-3 py-1 font-heading disabled:opacity-50"
+                    >
+                      {pickUpMutation.isPending && pickUpMutation.variables?.reservationId === r.id ? "Picking up..." : "Pick Up"}
                     </button>
                   )}
                 </div>

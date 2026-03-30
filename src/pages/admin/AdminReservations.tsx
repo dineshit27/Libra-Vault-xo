@@ -2,6 +2,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { Search, CheckCircle, XCircle, Clock, Save, Loader2 } from "lucide-react";
 import { useAdminAllReservations, useUpdateReservationStatus } from "@/hooks/useLibraryData";
+import { toast } from "sonner";
 
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.05 } } };
 const item = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } };
@@ -10,6 +11,16 @@ const AdminReservations = () => {
   const [search, setSearch] = useState("");
   const { data: reservations = [], isLoading } = useAdminAllReservations();
   const updateStatus = useUpdateReservationStatus();
+
+  const handleStatusUpdate = (id: string, status: "pending" | "ready" | "cancelled" | "fulfilled") => {
+    updateStatus.mutate(
+      { id, status },
+      {
+        onSuccess: () => toast.success(`Reservation ${status}`),
+        onError: (err: any) => toast.error(err.message || "Update failed"),
+      }
+    );
+  };
 
   const filtered = reservations.filter((r: any) =>
     r.bookTitle?.toLowerCase().includes(search.toLowerCase()) || 
@@ -68,17 +79,17 @@ const AdminReservations = () => {
                         <div className="flex gap-2">
                           <button
                             title="Mark as Ready"
-                            onClick={() => updateStatus.mutate({ id: res.id, status: "ready" })}
+                            onClick={() => handleStatusUpdate(res.id, "ready")}
                             disabled={updateStatus.isPending}
-                            className="brutal-btn bg-success text-success-foreground rounded-md p-1.5"
+                            className="brutal-btn bg-success text-success-foreground rounded-md p-1.5 disabled:opacity-50"
                           >
                             <CheckCircle className="w-4 h-4" />
                           </button>
                           <button
                             title="Cancel Reservation"
-                            onClick={() => updateStatus.mutate({ id: res.id, status: "cancelled" })}
+                            onClick={() => handleStatusUpdate(res.id, "cancelled")}
                             disabled={updateStatus.isPending}
-                            className="brutal-btn bg-destructive text-destructive-foreground rounded-md p-1.5"
+                            className="brutal-btn bg-destructive text-destructive-foreground rounded-md p-1.5 disabled:opacity-50"
                           >
                             <XCircle className="w-4 h-4" />
                           </button>
@@ -88,17 +99,17 @@ const AdminReservations = () => {
                         <div className="flex gap-2">
                           <button
                             title="Mark as Fulfilled (Checked out)"
-                            onClick={() => updateStatus.mutate({ id: res.id, status: "fulfilled" })}
+                            onClick={() => handleStatusUpdate(res.id, "fulfilled")}
                             disabled={updateStatus.isPending}
-                            className="brutal-btn bg-primary text-primary-foreground rounded-md p-1.5"
+                            className="brutal-btn bg-primary text-primary-foreground rounded-md p-1.5 disabled:opacity-50"
                           >
                             <Save className="w-4 h-4" />
                           </button>
                           <button
                             title="Cancel Reservation"
-                            onClick={() => updateStatus.mutate({ id: res.id, status: "cancelled" })}
+                            onClick={() => handleStatusUpdate(res.id, "cancelled")}
                             disabled={updateStatus.isPending}
-                            className="brutal-btn bg-destructive text-destructive-foreground rounded-md p-1.5"
+                            className="brutal-btn bg-destructive text-destructive-foreground rounded-md p-1.5 disabled:opacity-50"
                           >
                             <XCircle className="w-4 h-4" />
                           </button>

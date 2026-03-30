@@ -7,7 +7,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useAuthStore } from "@/store";
 import { toast } from "@/components/ui/sonner";
-import { signInWithEmail, signInWithGoogle } from "@/lib/auth";
+import { signInWithEmail, signInWithGoogle, getProfile, type AppUser } from "@/lib/auth";
 
 const schema = z.object({
   email: z.string().email("Invalid email address"),
@@ -22,6 +22,7 @@ const SignIn = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const loginAsGuest = useAuthStore((s) => s.loginAsGuest);
+  const setUser = useAuthStore((s) => s.setUser);
   const from = (location.state as { from?: { pathname: string } })?.from?.pathname;
 
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
@@ -31,12 +32,33 @@ const SignIn = () => {
   const onSubmit = async (data: FormData) => {
     setLoading(true);
     try {
-      await signInWithEmail(data.email, data.password);
+      const { user: sbUser } = await signInWithEmail(data.email, data.password);
+      
+      if (sbUser) {
+        // Sync profile immediately to update the store before navigation
+        const profile = await getProfile(sbUser.id);
+        if (profile) {
+          setUser(profile);
+        } else {
+          const meta = sbUser.user_metadata;
+          const fallback: AppUser = {
+            id: sbUser.id,
+            fullName: meta?.full_name || meta?.name || sbUser.email?.split("@")[0] || "User",
+            email: sbUser.email || "",
+            role: (meta?.role as "member" | "admin") || "member",
+            avatarUrl: meta?.avatar_url || meta?.picture,
+            membershipType: "basic",
+          };
+          setUser(fallback);
+        }
+      }
+
       toast.success("Signed in successfully!");
-      // Redirect after successful sign-in
+      
+      // Get the latest user state after sync
       const user = useAuthStore.getState().user;
       const dest = from || (user?.role === "admin" ? "/admin" : "/dashboard");
-      navigate(dest);
+      navigate(dest, { replace: true });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Sign in failed";
       toast.error(message);
